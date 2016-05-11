@@ -105,7 +105,6 @@ connect(Parent, N, PubSub, Opts) ->
                 subscribe(Client, AllOpts);
             pub ->
                Interval = proplists:get_value(interval_of_msg, Opts),
-               emqttc:publish(Client, topic_opt(Opts), <<"Hahahaha,on start">>, Flags),
                timer:send_interval(Interval, publish)
         end,
         loop(N, Client, PubSub, AllOpts);
