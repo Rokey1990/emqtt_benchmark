@@ -90,19 +90,19 @@ run(Parent, N, PubSub, Opts) ->
 	timer:sleep(proplists:get_value(interval, Opts)),
 	run(Parent, N-1, PubSub, Opts).
 stateMessage(State,ClientId)->
-  case State of
-     online ->Str=lists:concat(['{','"',type,'"',':','"',State,'"', ',','"',
-       msg,'"',':','{','"',clientId,'"',':','"',ClientId, '"',',','"',status,'"',':','"',State,'"','}','}']),
-    list_to_binary(Str);
-     offline->Str=lists:concat(['{','"',type,'"',':','"',State,'"',',','"',
-       msg,'"',':','{','"',clientId,'"',':','"',ClientId,'"',',','"',status,'"',':','"',State,'"','}','}']),
-       list_to_binary(Str);
-     _ -><<"error state">>
-end.
+    case State of
+    	online ->Str=lists:concat(['{','"',type,'"',':','"',State,'"', ',','"',
+    		msg,'"',':','{','"',clientId,'"',':','"',ClientId, '"',',','"',status,'"',':','"',State,'"','}','}']),
+    		list_to_binary(Str);
+     	offline->Str=lists:concat(['{','"',type,'"',':','"',State,'"',',','"',
+       		msg,'"',':','{','"',clientId,'"',':','"',ClientId,'"',',','"',status,'"',':','"',State,'"','}','}']),
+       		list_to_binary(Str);
+     	_ -><<"error state">>
+     end.
 
 binary_to_atom(Binary) ->
-List=binary:bin_to_list(Binary),
-list_to_atom(List).
+    List=binary:bin_to_list(Binary),
+    list_to_atom(List).
     
 connect(Parent, N, PubSub, Opts) ->
     process_flag(trap_exit, true),
@@ -112,10 +112,10 @@ connect(Parent, N, PubSub, Opts) ->
     TcpOpts  = tcp_opts(Opts),
     AllOpts  = [{seq, N}, {client_id, ClientId} | Opts],
     [Topic|_]=topics_opt(AllOpts),
-io:format("~w~n",[MqttOpts]),
-Will=[{qos, 2}, {retain, false}, {topic, Topic}, {payload, stateMessage(offline,binary_to_atom(ClientId))}],
-MqttOpts1=lists:append(MqttOpts,[{will,Will}]),
-io:format("~w~n",[MqttOpts1]),
+    io:format("~w~n",[MqttOpts]),
+    Will=[{qos, 2}, {retain, false}, {topic, Topic}, {payload, stateMessage(offline,binary_to_atom(ClientId))}],
+    MqttOpts1=lists:append(MqttOpts,[{will,Will}]),
+    io:format("~w~n",[MqttOpts1]),
 	case emqttc:start_link(MqttOpts1, TcpOpts) of
     {ok, Client} ->
         Parent ! {connected, N, Client},
@@ -124,8 +124,8 @@ io:format("~w~n",[MqttOpts1]),
                 subscribe(Client, AllOpts);
             pub ->
 		TopicContent = string:concat("content---->",binary:bin_to_list(ClientId)),
-io:format("~w~n~w~n",[list_to_atom(TopicContent),list_to_atom(binary:bin_to_list(Topic))]),	       
-emqttc:publish(Client,Topic,stateMessage(online,binary_to_atom(ClientId))),
+		io:format("~w~n~w~n",[list_to_atom(TopicContent),list_to_atom(binary:bin_to_list(Topic))]),	       
+		emqttc:publish(Client,Topic,stateMessage(online,binary_to_atom(ClientId))),
                Interval = proplists:get_value(interval_of_msg, Opts),
                timer:send_interval(Interval, publish)
         end,
