@@ -36,6 +36,7 @@ main(pub, Opts) ->
 
 start(PubSub, Opts) ->
     prepare(), init(),
+%%    io:format("~w~n",[Opts]),
     spawn(?MODULE, run, [self(), PubSub, Opts]),
     timer:send_interval(1000, stats),
     main_loop(os:timestamp(), 0).
@@ -112,10 +113,9 @@ connect(Parent, N, PubSub, Opts) ->
     TcpOpts  = tcp_opts(Opts),
     AllOpts  = [{seq, N}, {client_id, ClientId} | Opts],
     [Topic|_]=topics_opt(AllOpts),
-    io:format("~w~n",[MqttOpts]),
     Will=[{qos, 2}, {retain, false}, {topic, Topic}, {payload, stateMessage(offline,binary_to_atom(ClientId))}],
     MqttOpts1=lists:append(MqttOpts,[{will,Will}]),
-    io:format("~w~n",[MqttOpts1]),
+%%    io:format("~w~n",[MqttOpts1]),
 	case emqttc:start_link(MqttOpts1, TcpOpts) of
     {ok, Client} ->
         Parent ! {connected, N, Client},
@@ -123,11 +123,11 @@ connect(Parent, N, PubSub, Opts) ->
             sub ->
                 subscribe(Client, AllOpts);
             pub ->
-		TopicContent = string:concat("content---->",binary:bin_to_list(ClientId)),
-		io:format("~w~n~w~n",[list_to_atom(TopicContent),list_to_atom(binary:bin_to_list(Topic))]),	       
-		emqttc:publish(Client,Topic,stateMessage(online,binary_to_atom(ClientId))),
-               Interval = proplists:get_value(interval_of_msg, Opts),
-               timer:send_interval(Interval, publish)
+		            TopicContent = string:concat("content---->",binary:bin_to_list(ClientId)),
+		            io:format("~w~n~w~n",[list_to_atom(TopicContent),list_to_atom(binary:bin_to_list(Topic))]),
+		            emqttc:publish(Client,Topic,stateMessage(online,binary_to_atom(ClientId))),
+                Interval = proplists:get_value(interval_of_msg, Opts),
+                timer:send_interval(Interval, publish)
         end,
         loop(N, Client, PubSub, AllOpts);
     {error, Error} ->
@@ -137,6 +137,7 @@ connect(Parent, N, PubSub, Opts) ->
 loop(N, Client, PubSub, Opts) ->
     receive
         publish ->
+            io:format("~w~n",[Opts]),
             publish(Client, Opts),
             ets:update_counter(?TAB, sent, {2, 1}),
             loop(N, Client, PubSub, Opts);
@@ -149,13 +150,39 @@ loop(N, Client, PubSub, Opts) ->
 
 subscribe(Client, Opts) ->
     Qos = proplists:get_value(qos, Opts),
-    emqttc:subscribe(Client, [{Topic, Qos} || Topic <- topics_opt(Opts)]).
+    Topic2 = [{Topic, Qos} || Topic <- topics_opt(Opts)],
+    [{Topic,_}|_]=Topic2,
+    io:format("subscribe: ~w~n",[binary_to_atom(Topic)]),
+    emqttc:subscribe(Client, Topic2).
 
+get_topic_num(Opts) ->
+    proplists:get_value(num,Opts).
+
+get_topic(Num,Topic) ->
+    List=lists:concat([binary_to_atom(Topic),'/',Num]),
+    list_to_binary(List).
+publish_topics(Num,Topic,Client,Payload,Flags,Sleep) ->
+    case Num>0 of
+         true->
+             io:format("publish: topic=~w~n",[binary_to_atom(get_topic(Num,Topic))]),
+             emqttc:publish(Client,get_topic(Num,Topic),Payload,Flags),
+             timer:sleep(Sleep),
+             publish_topics(Num-1,Topic,Client,Payload,Flags,Sleep);
+         false->
+            ok
+    end.
 publish(Client, Opts) ->
+    Num = get_topic_num(Opts),
+    Msg_interval = proplists:get_value(interval_of_msg,Opts),
     Flags   = [{qos, proplists:get_value(qos, Opts)},
                {retain, proplists:get_value(retain, Opts)}],
     Payload = proplists:get_value(payload, Opts),
-    emqttc:publish(Client, topic_opt(Opts), Payload, Flags).
+    if
+        Num>0 ->io:format("~w---~w---~w~n",[Num,Msg_interval,Msg_interval div Num-2]),
+                publish_topics(Num,topic_opt(Opts),Client,Payload,Flags,Msg_interval div Num-2);
+        true ->emqttc:publish(Client, topic_opt(Opts), Payload, Flags)
+    end.
+%%    emqttc:publish(Client, topic_opt(Opts), Payload, Flags).
 
 mqtt_opts(Opts) ->
     [{logger, error}|mqtt_opts(Opts, [])].
