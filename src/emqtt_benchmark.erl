@@ -177,10 +177,13 @@ publish(Client, Opts) ->
     Flags   = [{qos, proplists:get_value(qos, Opts)},
                {retain, proplists:get_value(retain, Opts)}],
     Payload = proplists:get_value(payload, Opts),
+    io:format("publish: topic=~w~n",[binary_to_atom(topic_opt(Opts))]),
+    emqttc:publish(Client, topic_opt(Opts), Payload, Flags),
     if
         Num>0 ->io:format("~w---~w---~w~n",[Num,Msg_interval,Msg_interval div Num-2]),
                 publish_topics(Num,topic_opt(Opts),Client,Payload,Flags,Msg_interval div Num-2);
-        true ->emqttc:publish(Client, topic_opt(Opts), Payload, Flags)
+        true ->
+            ok
     end.
 %%    emqttc:publish(Client, topic_opt(Opts), Payload, Flags).
 
